@@ -1,15 +1,14 @@
 package com.zoo.hbase;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
 import org.apache.hadoop.hbase.ZooKeeperConnectionException;
 import org.apache.hadoop.hbase.client.Delete;
@@ -18,7 +17,11 @@ import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
+
+
 /**
  * 
  * @author yankai913@gmail.com
@@ -26,8 +29,10 @@ import org.apache.hadoop.hbase.util.Bytes;
  */
 public class SimpleClient {
 
+    static final String rowKey = "row1";
     static HBaseAdmin hBaseAdmin;
     static Configuration conf;
+
     static {
         conf = HBaseConfiguration.create();
         conf.set("hbase.zookeeper.quorum", "love-kaige");
@@ -44,20 +49,13 @@ public class SimpleClient {
 
 
     public static void createTable(String tableName, String[] columns) throws Exception {
-        if (hBaseAdmin.tableExists(tableName)) {
-            throw new IllegalStateException("table " + tableName + " already exists!");
-        }
+        dropTable(tableName);
         HTableDescriptor hTableDescriptor = new HTableDescriptor(tableName);
         for (String columnName : columns) {
             HColumnDescriptor column = new HColumnDescriptor(columnName);
             hTableDescriptor.addFamily(column);
         }
         hBaseAdmin.createTable(hTableDescriptor);
-        byte[] tablename = hTableDescriptor.getName();
-        HTableDescriptor[] tables = hBaseAdmin.listTables();
-        if (tables.length != 1 && Bytes.equals(tablename, tables[0].getName())) {
-            throw new IOException("failed create of table");
-        }
         System.out.println("create table successed");
     }
 
@@ -78,7 +76,7 @@ public class SimpleClient {
 
     public static void insert(String tableName, Map<String, String> map) throws Exception {
         HTable hTable = getHTable(tableName);
-        byte[] row1 = Bytes.toBytes("row1");
+        byte[] row1 = Bytes.toBytes(rowKey);
         Put p1 = new Put(row1);
         for (String columnName : map.keySet()) {
             byte[] value = Bytes.toBytes(map.get(columnName));
@@ -111,28 +109,63 @@ public class SimpleClient {
     }
 
 
-    public static void update() {
-
+    public static void selectOne(String tableName, String rowKey) throws Exception {
+        HTable hTable = getHTable(tableName);
+        Get g1 = new Get(Bytes.toBytes(rowKey));
+        Result result = hTable.get(g1);
+        foreach(result);
+        System.out.println("selectOne end");
     }
 
 
-    public static void select() {
+    private static void foreach(Result result) throws Exception {
+        for (KeyValue keyValue : result.raw()) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(Bytes.toString(keyValue.getRow())).append("\t");
+            sb.append(Bytes.toString(keyValue.getFamily())).append("\t");
+            sb.append(Bytes.toString(keyValue.getQualifier())).append("\t");
+            sb.append(keyValue.getTimestamp()).append("\t");
+            sb.append(Bytes.toString(keyValue.getValue())).append("\t");
+            System.out.println(sb.toString());
+        }
+    }
 
+
+    public static void selectAll(String tableName) throws Exception {
+        HTable hTable = getHTable(tableName);
+        Scan scan = new Scan();
+        ResultScanner resultScanner = null;
+        try {
+            resultScanner = hTable.getScanner(scan);
+            for (Result result : resultScanner) {
+                foreach(result);
+            }
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+        finally {
+            if (resultScanner != null) {
+                resultScanner.close();
+            }
+        }
+        System.out.println("selectAll end");
     }
 
 
     public static void main(String[] args) throws Exception {
-        // dropTable("ttt");
-        String tableName = "ttt";
+        String tableName = "tableTest";
         String[] columns = new String[] { "column_A", "column_B" };
-      //  createTable(tableName, columns);
+        createTable(tableName, columns);
         Map<String, String> map = new HashMap<String, String>();
         map.put("column_A", "AAA");
         map.put("column_B:1", "b1");
         map.put("column_B:2", "b2");
-       // insert("ttt", map);
-//        delete(tableName, rowKey);
+        insert(tableName, map);
+        selectOne(tableName, rowKey);
+        selectAll(tableName);
+        delete(tableName, rowKey);
+        dropTable(tableName);
     }
-
 
 }
