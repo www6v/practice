@@ -16,6 +16,10 @@ public class ClassLoaderTest {
 
 
     public static void main(String[] args) throws Exception {
+        // 打印java虚拟机的ClassLoader
+        System.out.println(Thread.currentThread().getContextClassLoader());
+        System.out.println(Thread.currentThread().getContextClassLoader().getParent());
+        System.out.println(Thread.currentThread().getContextClassLoader().getParent().getParent());
         // 自定义ClassLoader
         ClassLoader myLoader = new MyClassLoader();
         Class<?> clazz = myLoader.loadClass("com.zoo.classloader.ClassLoaderTest");
@@ -51,6 +55,9 @@ public class ClassLoaderTest {
         Thread.sleep(3000);
         // 获取CallClassLoader
         Class<?> clz = Class.forName("com.zoo.classloader.ClassLoaderTest");
+        System.out.println(clz);
+        System.out.println(clz.getClassLoader());
+        System.out.println(clz.getClass());
         System.out.println(clz.getClass().getClassLoader());
     }
 }
